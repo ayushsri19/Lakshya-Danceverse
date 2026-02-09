@@ -6,30 +6,67 @@ import LiveStream from './components/LiveStream';
 import AdminDashboard from './components/AdminDashboard';
 import TeacherDashboard from './components/TeacherDashboard';
 import VideoPlayer from './components/VideoPlayer';
-import { MOCK_COURSES, MOCK_LIVE_SESSIONS, CONTACT_INFO } from './constants';
+import { MOCK_COURSES, MOCK_LIVE_SESSIONS, CONTACT_INFO, BATCHES } from './constants';
 import { User, UserRole, Course, LiveSession, Analytics } from './types';
-import { generateLearningPlan } from './services/geminiService';
+
+// Accurate Lakshya Logo Component based on the provided poster
+export const LakshyaLogo = ({ size = "lg", className = "" }: { size?: "sm" | "md" | "lg", className?: string }) => {
+  const dim = size === "lg" ? "w-64 h-64 md:w-80 md:h-80" : (size === "md" ? "w-32 h-32" : "w-12 h-12");
+  return (
+    <div className={`relative ${dim} flex items-center justify-center ${className}`}>
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-6 z-20">
+        <div className="absolute inset-0 bg-white blur-[4px] rounded-full opacity-60"></div>
+        <div className="absolute inset-0 bg-[#fcf6ba] shadow-[0_0_20px_#bf953f] rounded-full scale-50"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[2px] h-10 bg-[#fcf6ba] blur-[1px]"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[2px] w-10 bg-[#fcf6ba] blur-[1px]"></div>
+      </div>
+      
+      <svg viewBox="0 0 200 200" className="absolute inset-0 w-full h-full">
+        <defs>
+          <linearGradient id="logoGold" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style={{ stopColor: '#bf953f' }} />
+            <stop offset="50%" style={{ stopColor: '#fcf6ba' }} />
+            <stop offset="100%" style={{ stopColor: '#b38728' }} />
+          </linearGradient>
+        </defs>
+        <path 
+          d="M40,140 A80,80 0 1,1 160,140" 
+          fill="none" 
+          stroke="url(#logoGold)" 
+          strokeWidth="2.5" 
+          strokeLinecap="round" 
+          className="drop-shadow-[0_0_8px_rgba(191,149,63,0.5)]"
+        />
+        <circle cx="100" cy="100" r="60" fill="none" stroke="#bf953f" strokeWidth="0.5" strokeDasharray="3,3" opacity="0.6" />
+      </svg>
+
+      <svg viewBox="0 0 100 100" className="w-[45%] h-[45%] z-10 fill-[#fcf6ba] drop-shadow-[0_0_12px_rgba(252,246,186,0.3)]">
+        <path d="M52,25 C54,25 56,27 56,29 C56,31 54,33 52,33 C50,33 48,31 48,29 C48,27 50,25 52,25 Z" />
+        <path d="M52,33 C52,33 48,40 40,42 C45,40 52,45 55,55 C58,65 52,80 45,85 C55,75 62,60 58,50 C54,40 75,30 85,20 C70,30 55,35 52,33 Z" />
+      </svg>
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('home');
   const [user, setUser] = useState<User | null>(null);
-  const [learningPlan, setLearningPlan] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
-  const [loginStep, setLoginStep] = useState<'main' | 'management'>('main');
+  const [selectedBatch, setSelectedBatch] = useState<string | null>(null);
+  const [loginStep, setLoginStep] = useState<'main' | 'terminal'>('main');
+  const [inquiries, setInquiries] = useState<any[]>([]);
+  const [formData, setFormData] = useState({ name: '', phone: '', email: '', experience: 'Beginner', message: '' });
 
-  const MOCK_ANALYTICS: Analytics = {
-    revenue: 0,
-    activeUsers: 540,
-    completionRate: 72,
-    topPerformingCourse: 'Fitness & Flow'
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleLogin = (role: UserRole) => {
     setUser({
-      id: 'u_session_' + Math.random().toString(36).substr(2, 9),
-      name: role === UserRole.STUDENT ? 'Student User' : (role === UserRole.TRAINER ? 'Alex K' : 'Admin Terminal'),
-      email: 'user@lakshyadanceverse.com',
+      id: 'LDV-' + Math.random().toString(36).substr(2, 5).toUpperCase(),
+      name: role === UserRole.STUDENT ? 'Student Member' : (role === UserRole.TRAINER ? 'Alex K' : 'Ayush Srivastava'),
+      email: 'member@lakshyadanceverse.com',
       role: role,
       isApproved: true,
       joinedAt: new Date().toISOString()
@@ -40,254 +77,153 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setUser(null);
     setActiveTab('home');
-    setSelectedCourse(null);
     setLoginStep('main');
   };
 
-  const renderLogin = () => (
-    <div className="min-h-[90vh] flex items-center justify-center p-4 bg-black relative overflow-hidden">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#bf953f]/5 rounded-full blur-[120px] pointer-events-none"></div>
-      
-      <div className="w-full max-w-xl bg-[#0a0a0a] p-12 rounded-[3rem] shadow-2xl border border-white/5 text-center relative z-10">
-        <div className="w-24 h-24 bg-[#bf953f] rounded-full flex items-center justify-center mx-auto mb-10 shadow-2xl shadow-[#bf953f]/20">
-          <span className="text-black font-bold text-3xl font-logo">LDV</span>
-        </div>
-
-        {loginStep === 'main' ? (
-          <>
-            <h2 className="text-4xl font-bold mb-4 gold-gradient font-logo uppercase tracking-widest">Entry Portal</h2>
-            <p className="text-slate-500 mb-12 tracking-wide">Welcome to the future of dance performance.</p>
-            
-            <div className="space-y-4">
-              <button 
-                onClick={() => handleLogin(UserRole.STUDENT)}
-                className="w-full py-5 bg-[#bf953f] hover:bg-[#fcf6ba] text-black font-bold rounded-2xl transition-all uppercase tracking-widest flex items-center justify-center gap-3"
-              >
-                Join as Student
-              </button>
-              
-              <div className="flex gap-4">
-                <button 
-                  className="flex-1 py-4 border border-white/10 hover:bg-white/5 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-3 text-xs uppercase tracking-widest"
-                >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                    <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                    <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                    <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                  </svg>
-                  Google Login
-                </button>
-              </div>
-
-              <button 
-                onClick={() => setLoginStep('management')}
-                className="w-full mt-6 py-4 text-xs font-bold text-slate-500 hover:text-[#bf953f] transition-all uppercase tracking-[0.3em]"
-              >
-                Administrative Terminal
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <button 
-              onClick={() => setLoginStep('main')}
-              className="absolute top-8 left-8 text-slate-500 hover:text-white transition-all"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-            </button>
-            <h2 className="text-3xl font-bold mb-4 text-white font-logo uppercase tracking-widest">Management</h2>
-            <p className="text-slate-500 mb-12">Authorized Personnel Only</p>
-            <div className="space-y-4">
-              <button 
-                onClick={() => handleLogin(UserRole.TRAINER)}
-                className="w-full py-5 bg-[#111] border border-[#bf953f]/30 hover:border-[#bf953f] text-[#bf953f] font-bold rounded-2xl transition-all uppercase tracking-widest"
-              >
-                Instructor Entry
-              </button>
-              <button 
-                onClick={() => handleLogin(UserRole.ADMIN)}
-                className="w-full py-5 bg-[#111] border border-red-900/30 hover:border-red-600 text-red-600 font-bold rounded-2xl transition-all uppercase tracking-widest"
-              >
-                System Admin
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-
-  const renderHome = () => (
-    <div className="bg-black text-white selection:bg-[#bf953f] selection:text-black">
-      {/* Hero Section - Based on the Poster */}
-      <section className="relative min-h-screen flex flex-col items-center justify-center px-4 overflow-hidden pt-20">
-        <div className="absolute inset-0 z-0 opacity-40">
-           <img src="https://images.unsplash.com/photo-1547153760-18fc86324498?auto=format&fit=crop&w=1920&q=80" className="w-full h-full object-cover grayscale" />
-           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent"></div>
-        </div>
-
-        <div className="max-w-7xl mx-auto w-full relative z-10 text-center md:text-left flex flex-col md:flex-row items-center gap-16">
-          <div className="flex-1 space-y-10 animate-fade-in">
-             <div className="space-y-2">
-                <span className="text-[#bf953f] font-bold tracking-[0.5em] text-xs uppercase block">Est. 2025</span>
-                <h2 className="text-4xl md:text-6xl font-display uppercase tracking-tight leading-none text-slate-300">A NEW ERA OF</h2>
-                <h1 className="text-7xl md:text-[10rem] font-display uppercase tracking-tighter leading-none gold-gradient">PERFORMANCE</h1>
-             </div>
-             
-             <div className="grid grid-cols-2 md:grid-cols-3 gap-8 py-8 border-y border-white/10">
-                <div>
-                   <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1">Scope</p>
-                   <p className="text-lg font-bold">All Levels • All Ages</p>
-                </div>
-                <div>
-                   <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1">Focus</p>
-                   <p className="text-lg font-bold">Dance • Fitness</p>
-                </div>
-                <div>
-                   <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1">Location</p>
-                   <p className="text-lg font-bold flex items-center gap-1">
-                      <svg className="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20"><path d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" /></svg>
-                      Lucknow
-                   </p>
-                </div>
-             </div>
-
-             <div className="flex flex-col sm:flex-row gap-6">
-                <button 
-                  onClick={() => setActiveTab('login')}
-                  className="px-12 py-5 bg-[#bf953f] text-black font-bold rounded-full hover:scale-105 transition-transform shadow-2xl shadow-[#bf953f]/20 uppercase tracking-widest text-sm"
-                >
-                  Admissions Open
-                </button>
-                <div className="flex flex-col justify-center text-left border-l border-[#bf953f]/30 pl-6">
-                   <p className="text-[10px] uppercase tracking-widest text-slate-400">Founder</p>
-                   <p className="font-bold text-white">{CONTACT_INFO.founder}</p>
-                   <p className="text-[10px] uppercase tracking-widest text-slate-400 mt-2">Training by</p>
-                   <p className="font-bold text-white">{CONTACT_INFO.trainer}</p>
-                </div>
-             </div>
-          </div>
-
-          <div className="flex-1 flex justify-center relative animate-fade-in delay-200">
-             <div className="relative w-80 h-80 md:w-[500px] md:h-[500px]">
-                {/* Logo Re-creation */}
-                <div className="absolute inset-0 border-2 border-[#bf953f]/20 rounded-full animate-spin-slow"></div>
-                <div className="absolute inset-4 border border-[#bf953f]/40 rounded-full"></div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-center">
-                       <div className="w-32 h-32 md:w-64 md:h-64 mx-auto mb-6 relative">
-                          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4 h-4 bg-[#bf953f] rounded-full blur-sm animate-pulse shadow-[0_0_20px_#bf953f]"></div>
-                          {/* Silhouette Placeholder */}
-                          <svg className="w-full h-full text-[#bf953f]" fill="currentColor" viewBox="0 0 100 100">
-                             <path d="M50 20c-2.2 0-4 1.8-4 4s1.8 4 4 4 4-1.8 4-4-1.8-4-4-4zm15 15c-5 0-9 4-9 9 0 3.3 1.8 6.1 4.5 7.6L45 75h10l8-15 12-5-5-15c-1-3-3.3-5-5-5z" />
-                          </svg>
-                       </div>
-                       <h3 className="font-logo text-4xl md:text-6xl gold-gradient font-bold tracking-widest uppercase">LAKSHYA</h3>
-                       <p className="font-logo text-xl md:text-2xl text-slate-400 tracking-[0.2em] font-bold">DANCEVERSE</p>
-                       <p className="text-[10px] uppercase tracking-[0.5em] text-[#bf953f] mt-4 font-bold italic">Aim. Move. Become.</p>
-                    </div>
-                </div>
-             </div>
-          </div>
-        </div>
-        
-        {/* Footer Contact bar from poster */}
-        <div className="max-w-7xl mx-auto w-full mt-24 flex flex-wrap justify-center md:justify-between gap-8 py-8 border-t border-white/5 relative z-10">
-           <div className="flex items-center gap-4 group cursor-pointer">
-              <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-[#bf953f] transition-all">
-                 <svg className="w-5 h-5 group-hover:text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-              </div>
-              <div>
-                 <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Enquiries</p>
-                 <p className="text-sm font-mono text-slate-300">{CONTACT_INFO.phone1}</p>
-                 <p className="text-sm font-mono text-slate-300">{CONTACT_INFO.phone2}</p>
-              </div>
-           </div>
-        </div>
-      </section>
-
-      {/* Featured Courses - Academy Section */}
-      <section className="max-w-7xl mx-auto px-4 py-32">
-        <div className="text-center mb-20">
-          <h2 className="text-5xl font-display gold-gradient uppercase mb-4">Elite Training Paths</h2>
-          <p className="text-slate-500 max-w-xl mx-auto uppercase tracking-widest text-xs font-bold">Standardized curriculum for the next generation of performers.</p>
-        </div>
-        <div className="grid md:grid-cols-3 gap-10">
-          {MOCK_COURSES.map(course => (
-            <CourseCard key={course.id} course={course} onClick={(id) => { setSelectedCourse(MOCK_COURSES.find(c => c.id === id)!); setActiveTab('course-view'); }} />
-          ))}
-        </div>
-      </section>
-    </div>
-  );
-
-  const renderDashboard = () => {
-    if (!user) return renderHome();
-    switch (user.role) {
-      case UserRole.ADMIN:
-        return <div className="max-w-7xl mx-auto px-4 py-12"><AdminDashboard analytics={MOCK_ANALYTICS} pendingApprovals={[]} onApprove={() => {}} /></div>;
-      case UserRole.TRAINER:
-        return <div className="max-w-7xl mx-auto px-4 py-12"><TeacherDashboard courses={MOCK_COURSES} liveSessions={MOCK_LIVE_SESSIONS} onStartLive={() => setActiveTab('live')} onUploadVideo={() => {}} /></div>;
-      default:
-        return (
-          <div className="max-w-7xl mx-auto px-4 py-12">
-            <h1 className="text-4xl font-logo gold-gradient mb-8 uppercase tracking-widest">Student Portal</h1>
-            <div className="grid lg:grid-cols-3 gap-8">
-               <div className="lg:col-span-2 space-y-8">
-                  <div className="bg-[#111] p-10 rounded-3xl border border-white/5 shadow-2xl">
-                     <h3 className="text-2xl font-bold mb-6 flex items-center gap-3">
-                        <span className="w-2 h-8 bg-[#bf953f]"></span>
-                        My Training Roadmap
-                     </h3>
-                     <div className="space-y-6">
-                        {MOCK_COURSES.slice(0, 1).map(c => (
-                          <div key={c.id} className="p-6 bg-black rounded-2xl border border-white/10 flex gap-6 items-center">
-                             <img src={c.thumbnail} className="w-32 h-20 object-cover rounded-lg opacity-60" />
-                             <div className="flex-grow">
-                                <h4 className="font-bold text-white mb-2">{c.title}</h4>
-                                <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                                   <div className="h-full bg-[#bf953f]" style={{ width: '15%' }}></div>
-                                </div>
-                                <p className="text-[10px] uppercase text-slate-500 mt-2 font-bold tracking-widest">15% Progress</p>
-                             </div>
-                             <button onClick={() => {setSelectedCourse(c); setActiveTab('course-view');}} className="px-6 py-2 bg-white/5 hover:bg-[#bf953f] hover:text-black rounded-lg text-xs font-bold transition-all uppercase tracking-widest">Resume</button>
-                          </div>
-                        ))}
-                     </div>
-                  </div>
-               </div>
-               <div className="bg-[#111] p-8 rounded-3xl border border-white/5 shadow-2xl">
-                   <h3 className="text-xl font-bold mb-6 gold-gradient uppercase tracking-widest">Live Now</h3>
-                   {MOCK_LIVE_SESSIONS.map(s => (
-                     <div key={s.id} onClick={() => setActiveTab('live')} className="p-4 bg-red-600/10 border border-red-600/30 rounded-2xl cursor-pointer hover:bg-red-600/20 transition-all">
-                        <div className="flex items-center gap-2 mb-2">
-                           <span className="w-2 h-2 bg-red-600 rounded-full animate-ping"></span>
-                           <span className="text-[10px] font-bold text-red-600 uppercase tracking-widest">Streaming</span>
-                        </div>
-                        <p className="font-bold text-white">{s.title}</p>
-                        <p className="text-xs text-slate-500 mt-1">{s.instructorName}</p>
-                     </div>
-                   ))}
-               </div>
-            </div>
-          </div>
-        );
-    }
+  const handleAdmissionSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newInquiry = {
+      id: Date.now(),
+      ...formData,
+      program: selectedCourse?.title,
+      batch: selectedBatch,
+      date: new Date().toLocaleString()
+    };
+    setInquiries([newInquiry, ...inquiries]);
+    setActiveTab('confirmation');
   };
 
+  const renderHome = () => (
+    <div className="bg-black text-white selection:bg-[#bf953f] selection:text-black min-h-screen">
+      <section className="relative min-h-screen flex flex-col md:flex-row items-center justify-center px-6 pt-16 overflow-hidden">
+        <div className="hero-glow"></div>
+        <div className="flex-1 max-w-3xl relative z-10 space-y-10 text-center md:text-left animate-fade-in">
+          <div className="space-y-4">
+            <h2 className="text-3xl md:text-5xl font-display text-slate-300 tracking-tight uppercase">A NEW ERA OF</h2>
+            <h1 className="text-7xl md:text-[10rem] font-display leading-none gold-text uppercase tracking-tighter">PERFORMANCE</h1>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-8 py-8 border-y border-white/10">
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Scope</p>
+              <p className="text-lg font-bold">All Levels • All Ages</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Core</p>
+              <p className="text-lg font-bold">Dance • Fitness</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Location</p>
+              <p className="text-lg font-bold flex items-center justify-center md:justify-start gap-1">
+                <svg className="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20"><path d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" /></svg>Lucknow
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-6 justify-center md:justify-start items-center">
+            <button onClick={() => setActiveTab('courses')} className="px-14 py-5 bg-[#bf953f] text-black font-bold rounded-full hover:scale-105 transition-transform shadow-2xl shadow-[#bf953f]/30 uppercase tracking-[0.2em] text-sm animate-pulse-gold">Admissions Open</button>
+            <div className="text-left border-l border-[#bf953f]/40 pl-6 space-y-1">
+              <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Founded by</p>
+              <p className="font-bold text-lg">{CONTACT_INFO.founder}</p>
+              <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mt-2">Training by</p>
+              <p className="font-bold text-lg">{CONTACT_INFO.trainer}</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 flex justify-center items-center relative z-10 py-16 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+          <div className="text-center group">
+            <LakshyaLogo size="lg" className="mx-auto" />
+            <div className="mt-8 space-y-2">
+              <h3 className="font-logo text-5xl md:text-7xl gold-text font-bold tracking-[0.2em] uppercase">LAKSHYA</h3>
+              <p className="font-logo text-2xl md:text-3xl text-slate-400 tracking-[0.2em] uppercase">DANCEVERSE</p>
+              <p className="text-sm italic gold-text font-bold tracking-[0.6em] mt-6 uppercase">Aim. Move. Become.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+
   const renderCourses = () => (
-    <div className="max-w-7xl mx-auto px-4 py-24">
-      <div className="text-center mb-24">
-         <h1 className="text-6xl font-display gold-gradient uppercase mb-4">The Syllabus</h1>
-         <p className="text-slate-500 uppercase tracking-[0.3em] text-xs font-bold">Standardized Training Units | Lucknow Headquarters</p>
+    <div className="max-w-7xl mx-auto px-6 py-24 animate-fade-in">
+      <div className="text-center mb-24 space-y-4">
+         <h1 className="text-6xl font-display gold-text uppercase tracking-tighter">Signature Programs</h1>
+         <p className="text-slate-500 uppercase tracking-[0.4em] text-[10px] font-bold">Standardized Professional Training Units</p>
       </div>
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-        {MOCK_COURSES.concat(MOCK_COURSES).map((c, i) => (
-          <CourseCard key={i} course={c} onClick={(id) => { setSelectedCourse(MOCK_COURSES.find(course => course.id === id)!); setActiveTab('course-view'); }} />
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-12">
+        {MOCK_COURSES.map(course => (
+          <CourseCard key={course.id} course={course} onClick={() => { setSelectedCourse(course); setActiveTab('batch-selection'); }} />
         ))}
+      </div>
+    </div>
+  );
+
+  const renderBatchSelection = () => (
+    <div className="max-w-4xl mx-auto px-6 py-24 animate-fade-in">
+      <button onClick={() => setActiveTab('courses')} className="text-slate-500 hover:text-white mb-10 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10 19l-7-7m0 0l7-7m-7 7h18" strokeWidth="2"/></svg> Back to Programs
+      </button>
+      <h2 className="text-5xl font-display gold-text uppercase mb-2">Select your Batch</h2>
+      <p className="text-slate-500 mb-12 uppercase tracking-[0.3em] text-xs font-bold">Program: {selectedCourse?.title}</p>
+      <div className="grid md:grid-cols-2 gap-6">
+        {BATCHES.map(batch => (
+          <button key={batch.id} onClick={() => { setSelectedBatch(`${batch.name} (${batch.time})`); setActiveTab('admission-form'); }} className="p-8 bg-[#0a0a0a] border border-white/5 rounded-3xl text-left hover:border-[#bf953f]/50 hover:bg-[#bf953f]/5 transition-all group relative overflow-hidden">
+            <div className="relative z-10">
+              <h3 className="text-xl font-bold text-white mb-2 group-hover:gold-text transition-all">{batch.name}</h3>
+              <p className="text-sm text-slate-400 font-mono mb-4">{batch.time}</p>
+              <p className="text-[10px] uppercase tracking-widest text-[#bf953f] font-bold">{batch.days}</p>
+            </div>
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-100 transition-opacity">
+               <svg className="w-8 h-8 text-[#bf953f]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 7l5 5m0 0l-5 5m5-5H6" strokeWidth="2"/></svg>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderAdmissionForm = () => (
+    <div className="max-w-xl mx-auto px-6 py-24 animate-fade-in">
+      <div className="text-center mb-12">
+        <h2 className="text-4xl font-display gold-text uppercase mb-2">Admission Inquiry</h2>
+        <p className="text-slate-500 uppercase tracking-widest text-[10px] font-bold">{selectedCourse?.title} • {selectedBatch}</p>
+      </div>
+      <form onSubmit={handleAdmissionSubmit} className="space-y-6">
+        <div className="space-y-2">
+          <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Full Name</label>
+          <input required name="name" onChange={handleInputChange} value={formData.name} type="text" className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 focus:ring-1 focus:ring-[#bf953f] focus:outline-none transition-all" placeholder="Enter your full name" />
+        </div>
+        <div className="space-y-2">
+          <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Phone Number</label>
+          <input required name="phone" onChange={handleInputChange} value={formData.phone} type="tel" className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 focus:ring-1 focus:ring-[#bf953f] focus:outline-none transition-all" placeholder="+91 XXXX XXX XXX" />
+        </div>
+        <div className="space-y-2">
+          <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Experience Level</label>
+          <select name="experience" onChange={handleInputChange} value={formData.experience} className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 focus:ring-1 focus:ring-[#bf953f] focus:outline-none transition-all appearance-none text-slate-300">
+            <option className="bg-black">Beginner</option>
+            <option className="bg-black">Intermediate</option>
+            <option className="bg-black">Advanced</option>
+          </select>
+        </div>
+        <div className="space-y-2">
+          <label className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Message (Optional)</label>
+          <textarea name="message" onChange={handleInputChange} value={formData.message} className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 focus:ring-1 focus:ring-[#bf953f] focus:outline-none transition-all h-32" placeholder="Tell us about your interest..."></textarea>
+        </div>
+        <button type="submit" className="w-full py-5 bg-[#bf953f] text-black font-bold rounded-xl uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-[#bf953f]/10">Submit Enrollment Request</button>
+      </form>
+    </div>
+  );
+
+  const renderConfirmation = () => (
+    <div className="max-w-xl mx-auto px-6 py-40 text-center animate-fade-in">
+      <div className="w-24 h-24 bg-gradient-to-br from-[#bf953f] to-[#b38728] rounded-full flex items-center justify-center mx-auto mb-10 shadow-2xl shadow-[#bf953f]/20">
+         <svg className="w-12 h-12 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      </div>
+      <h2 className="text-5xl font-display gold-text uppercase mb-4">Request Received</h2>
+      <p className="text-slate-400 mb-12 text-lg">Thank you for choosing Lakshya Danceverse. Ayush Srivastava and the team will review your application. You will receive an official response via WhatsApp within 24 hours.</p>
+      <div className="flex flex-col gap-4">
+        <a href={`https://wa.me/${CONTACT_INFO.phone1.replace(/\D/g, '')}?text=${encodeURIComponent(CONTACT_INFO.whatsappMsg)}`} target="_blank" className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 shadow-xl">
+          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.025 3.312l-.548 2.037 2.082-.547c.916.51 1.946.78 3.209.78 3.182 0 5.767-2.586 5.768-5.766 0-3.18-2.586-5.766-5.768-5.766z"/></svg>Chat on WhatsApp
+        </a>
+        <button onClick={() => setActiveTab('home')} className="text-slate-500 hover:text-[#bf953f] text-xs font-bold uppercase tracking-widest mt-6">Return to Home</button>
       </div>
     </div>
   );
@@ -295,36 +231,36 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'home': return renderHome();
-      case 'dashboard': return renderDashboard();
+      case 'dashboard': return <AdminDashboard analytics={{revenue:0, activeUsers:142, completionRate:85, topPerformingCourse:'Hip Hop Fundamentals'}} inquiries={inquiries} />;
       case 'courses': return renderCourses();
-      case 'live': return <div className="max-w-7xl mx-auto px-4 py-12"><LiveStream sessionTitle="Live Studio: Performance Mastery" instructorName="Alex K" /></div>;
+      case 'batch-selection': return renderBatchSelection();
+      case 'admission-form': return renderAdmissionForm();
+      case 'confirmation': return renderConfirmation();
+      case 'live': return <div className="max-w-7xl mx-auto px-6 py-12"><LiveStream sessionTitle="Live Studio: Elite Performance" instructorName="Alex K" /></div>;
       case 'course-view': return (
-        <div className="max-w-7xl mx-auto px-4 py-12">
-          <button onClick={() => setActiveTab('courses')} className="flex items-center gap-2 text-slate-500 hover:text-[#bf953f] font-bold uppercase tracking-widest text-[10px] mb-12 transition-all">
-             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-             Back to Syllabus
-          </button>
-          <div className="grid lg:grid-cols-3 gap-12">
-             <div className="lg:col-span-2 space-y-8">
+        <div className="max-w-7xl mx-auto px-6 py-12 animate-fade-in">
+          <button onClick={() => setActiveTab('courses')} className="text-slate-500 hover:text-[#bf953f] font-bold uppercase tracking-[0.3em] text-[10px] mb-12 flex items-center gap-2"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10 19l-7-7m0 0l7-7m-7 7h18" strokeWidth="2" strokeLinecap="round"/></svg> Return to Academy</button>
+          <div className="grid lg:grid-cols-3 gap-16">
+             <div className="lg:col-span-2 space-y-10">
                 <VideoPlayer src="https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" poster={selectedCourse?.thumbnail} />
-                <h1 className="text-5xl font-display text-white uppercase tracking-tight">{selectedCourse?.title}</h1>
-                <p className="text-lg text-slate-400 leading-relaxed font-light">{selectedCourse?.description}</p>
+                <div className="space-y-6">
+                  <h1 className="text-6xl font-display text-white uppercase tracking-tight leading-none">{selectedCourse?.title}</h1>
+                  <p className="text-lg text-slate-400 leading-relaxed font-light max-w-2xl">{selectedCourse?.description}</p>
+                </div>
              </div>
-             <div className="bg-[#111] p-8 rounded-3xl border border-white/5 h-fit sticky top-24 shadow-2xl">
-                <h3 className="text-xl font-bold mb-6 gold-gradient uppercase tracking-widest border-b border-[#bf953f]/20 pb-4">Content Breakdown</h3>
-                <div className="space-y-4">
-                   {selectedCourse?.modules.map(m => (
-                     <div key={m.id} className="space-y-2">
-                        <p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">{m.title}</p>
-                        {m.lessons.map(l => (
-                          <div key={l.id} className="p-3 bg-black/40 border border-white/5 rounded-xl text-xs font-bold text-slate-300 flex justify-between items-center group cursor-pointer hover:border-[#bf953f]/50 transition-all">
-                             <span className="group-hover:text-white transition-colors">{l.title}</span>
-                             <span className="text-[10px] text-slate-600">{Math.floor(l.duration / 60)}m</span>
-                          </div>
-                        ))}
+             <div className="bg-[#0a0a0a] border border-white/5 rounded-[2.5rem] p-10 h-fit sticky top-24 shadow-2xl">
+                <h3 className="text-xl font-bold mb-10 gold-text uppercase tracking-widest border-b border-white/5 pb-4">Session Map</h3>
+                <div className="space-y-6">
+                   {selectedCourse?.modules.map((m, idx) => (
+                     <div key={m.id} className="space-y-4">
+                        <p className="text-[10px] uppercase font-bold text-slate-600 tracking-[0.2em]">Unit {idx + 1}: {m.title}</p>
+                        <div className="space-y-3">
+                           {m.lessons.map(l => (
+                             <div key={l.id} className="p-4 bg-black border border-white/5 rounded-2xl text-xs font-bold text-slate-400 flex justify-between items-center group cursor-pointer hover:border-[#bf953f]/40 transition-all"><span className="group-hover:text-white transition-colors">{l.title}</span><span className="text-[10px] text-slate-700 font-mono">{Math.floor(l.duration / 60)}:{(l.duration % 60).toString().padStart(2, '0')}</span></div>
+                           ))}
+                        </div>
                      </div>
                    ))}
-                   {(!selectedCourse?.modules || selectedCourse.modules.length === 0) && <p className="text-slate-600 text-sm italic">Lessons coming soon...</p>}
                 </div>
              </div>
           </div>
@@ -336,12 +272,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <Layout 
-      activeTab={activeTab} 
-      setActiveTab={setActiveTab} 
-      userRole={user?.role || null}
-      onLogout={handleLogout}
-    >
+    <Layout activeTab={activeTab} setActiveTab={setActiveTab} userRole={user?.role || null} onLogout={handleLogout}>
       {renderContent()}
     </Layout>
   );

@@ -12,8 +12,16 @@ export const CONTACT_INFO = {
   phone2: '+91 9236596740',
   location: 'Lucknow',
   founder: 'Ayush Srivastava',
-  trainer: 'Alex K'
+  trainer: 'Alex K',
+  whatsappMsg: "Hi Lakshya Danceverse, I'm interested in joining the academy!"
 };
+
+export const BATCHES = [
+  { id: 'b1', name: 'Morning Elite', time: '07:30 AM - 09:30 AM', days: 'Mon-Fri' },
+  { id: 'b2', name: 'Evening Power', time: '05:00 PM - 07:00 PM', days: 'Mon-Fri' },
+  { id: 'b3', name: 'Weekend Masterclass', time: '10:00 AM - 01:00 PM', days: 'Sat-Sun' },
+  { id: 'b4', name: 'Kids Foundation', time: '04:00 PM - 05:00 PM', days: 'Tue-Thu-Sat' }
+];
 
 export const MOCK_COURSES: Course[] = [
   {
@@ -24,7 +32,7 @@ export const MOCK_COURSES: Course[] = [
     instructorName: 'Alex K',
     thumbnail: 'https://images.unsplash.com/photo-1535525153412-5a42439a210d?auto=format&fit=crop&w=800&q=80',
     category: 'Hip Hop',
-    price: 0, // Free/Startup phase
+    price: 0, 
     rating: 4.8,
     studentsCount: 1245,
     difficulty: 'Beginner',

@@ -1,6 +1,6 @@
 {
-  "name": "GrooveStream Dance Academy",
-  "description": "A professional-grade dance academy platform featuring online courses, live streaming classes, scheduling, and an AI-powered personalized training assistant.",
+  "name": "Lakshya Danceverse",
+  "description": "Premium Dance Academy in Lucknow. Aim. Move. Become.",
   "requestFramePermissions": [
     "camera",
     "microphone"
